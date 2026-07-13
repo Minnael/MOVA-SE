@@ -15,3 +15,8 @@ venv/
 
 # uv
 .uv/
+
+# Segredos / variáveis de ambiente
+.env
+.env.*
+!.env.example
