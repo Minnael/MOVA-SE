@@ -7,7 +7,7 @@ para o grafo de orquestração.
 from __future__ import annotations
 
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.graph.builder import construir_grafo
 
@@ -19,16 +19,22 @@ grafo = construir_grafo()
 
 
 class RequisicaoRota(BaseModel):
-    """Corpo da requisição: texto livre descrevendo o evento desejado."""
+    """Corpo da requisição: parâmetros estruturados da rota desejada."""
 
-    texto: str
+    ponto_partida: str  # coordenadas "lat, lon" ou endereço
+    distancia_alvo_km: float = Field(gt=0)
 
 
 @app.post("/rotas")
 def solicitar_rota(requisicao: RequisicaoRota) -> dict:
-    """Recebe o texto do usuário e aciona o grafo agêntico.
+    """Recebe os parâmetros da rota e aciona o grafo agêntico.
 
     Ainda não executa roteamento real: retorna o estado resultante com os
-    requisitos (mocados) extraídos pelo Orquestrador.
+    requisitos consolidados pelo Orquestrador (parte dos campos ainda mocada).
     """
-    return grafo.invoke({"texto_entrada": requisicao.texto})
+    return grafo.invoke(
+        {
+            "ponto_partida": requisicao.ponto_partida,
+            "distancia_alvo_km": requisicao.distancia_alvo_km,
+        }
+    )
