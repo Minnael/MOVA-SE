@@ -17,16 +17,21 @@ def consolidar_requisitos(estado: EstadoAgentico) -> dict:
     """Consolida os campos extraídos em ``requisitos``.
 
     Args:
-        estado: estado agêntico contendo ``lugar``, ``distancia_alvo_km`` e
-            ``horario_inicio`` (produzidos pelos nós de extração).
+        estado: estado agêntico contendo ``lugar``, ``distancia_alvo_km``,
+            ``data_inicio`` e ``horario_inicio`` (produzidos pelos nós de extração).
 
     Returns:
         Atualização parcial do estado com a chave ``requisitos``.
     """
+    # Combina data e hora (estados separados) em uma janela temporal ISO 8601:
+    # datetime quando há hora, apenas a data quando ela está ausente.
+    data, hora = estado["data_inicio"], estado["horario_inicio"]
+    janela = f"{data}T{hora}" if hora else data
+
     requisitos: RequisitosRota = {
         "ponto_partida": estado["lugar"],
         "distancia_alvo_km": estado["distancia_alvo_km"],
-        "janela_temporal": estado["horario_inicio"],
+        "janela_temporal": janela,
         # TODO: ainda mocados; virão de entrada/extração em seguida.
         "perfil_altimetria": "Moderado",
         "modalidade": "Corrida de Rua Pedestre",

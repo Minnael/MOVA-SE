@@ -35,6 +35,7 @@ class EstadoAgentico(TypedDict):
     # Campos extraídos pelos nós de extração paralelos (cada nó escreve o seu).
     lugar: str  # nome do lugar de partida
     distancia_alvo_km: float
-    horario_inicio: str  # data/hora ISO 8601 do início
+    data_inicio: str  # data resolvida em ISO (YYYY-MM-DD)
+    horario_inicio: str | None  # hora "HH:MM" ou None quando ausente no texto
     # Requisitos consolidados pelo Orquestrador.
     requisitos: RequisitosRota | None
