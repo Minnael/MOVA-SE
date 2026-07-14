@@ -1,10 +1,10 @@
 """Estado agêntico — o "barramento de contexto" que trafega pelo grafo.
 
 Cada nó (agente) lê e escreve neste estado compartilhado. Por enquanto ele
-carrega os campos de entrada vindos do payload da API (ponto de partida e
-distância-alvo) e os requisitos consolidados pelo Orquestrador. Conforme os
-demais agentes forem implementados, novos campos serão adicionados (fatores
-meteorológicos, características viárias, rota calculada, etc.).
+carrega o texto de entrada (payload da API), os campos extraídos por cada nó de
+extração paralelo (lugar, distância, horário) e os requisitos consolidados pelo
+Orquestrador. Conforme os demais agentes forem implementados, novos campos serão
+adicionados (fatores meteorológicos, características viárias, rota calculada, etc.).
 """
 
 from __future__ import annotations
@@ -30,8 +30,11 @@ class RequisitosRota(TypedDict, total=False):
 class EstadoAgentico(TypedDict):
     """Estado compartilhado entre os nós do grafo."""
 
-    # Entradas estruturadas recebidas no payload da API.
-    ponto_partida: str  # coordenadas "lat, lon" ou endereço para geocoding
+    # Entrada recebida no payload da API.
+    texto_descritivo: str  # descrição em linguagem natural
+    # Campos extraídos pelos nós de extração paralelos (cada nó escreve o seu).
+    lugar: str  # nome do lugar de partida
     distancia_alvo_km: float
+    horario_inicio: str  # data/hora ISO 8601 do início
     # Requisitos consolidados pelo Orquestrador.
     requisitos: RequisitosRota | None

@@ -1,11 +1,11 @@
 """Nó do Agente 1 — Orquestrador / Engenheiro de Requisitos.
 
-Responsável por consolidar os requisitos estruturados que alimentam os agentes
-subordinados.
+Responsável por consolidar (fan-in) os campos extraídos pelos nós de extração
+paralelos em um único dicionário de requisitos estruturados que alimenta os
+agentes subordinados.
 
-Por ora o nó apenas valida e repassa os campos já estruturados vindos do payload
-da API (``ponto_partida`` e ``distancia_alvo_km``); os três campos restantes
-seguem mocados até a definição da entrada/extração final.
+Por ora dois campos do contrato (``perfil_altimetria`` e ``modalidade``) seguem
+mocados, até que sua entrada/extração seja definida.
 """
 
 from __future__ import annotations
@@ -13,23 +13,22 @@ from __future__ import annotations
 from app.graph.state import EstadoAgentico, RequisitosRota
 
 
-def extrair_requisitos(estado: EstadoAgentico) -> dict:
-    """Consolida os requisitos da rota a partir do estado de entrada.
+def consolidar_requisitos(estado: EstadoAgentico) -> dict:
+    """Consolida os campos extraídos em ``requisitos``.
 
     Args:
-        estado: estado agêntico contendo ``ponto_partida`` e
-            ``distancia_alvo_km`` (vindos do payload da API).
+        estado: estado agêntico contendo ``lugar``, ``distancia_alvo_km`` e
+            ``horario_inicio`` (produzidos pelos nós de extração).
 
     Returns:
         Atualização parcial do estado com a chave ``requisitos``.
     """
-    # TODO: os três campos abaixo ainda são mocados; virão de entrada/extração
-    # (parsing via LLM) em seguida.
     requisitos: RequisitosRota = {
-        "ponto_partida": estado["ponto_partida"],
+        "ponto_partida": estado["lugar"],
         "distancia_alvo_km": estado["distancia_alvo_km"],
+        "janela_temporal": estado["horario_inicio"],
+        # TODO: ainda mocados; virão de entrada/extração em seguida.
         "perfil_altimetria": "Moderado",
-        "janela_temporal": "2026-07-19T07:00",
         "modalidade": "Corrida de Rua Pedestre",
     }
     return {"requisitos": requisitos}
