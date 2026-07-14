@@ -5,8 +5,8 @@ uma lê ``texto_descritivo`` e escreve apenas a sua chave no estado, de modo que
 não há conflito de escrita concorrente entre elas. O nó Orquestrador consolida
 os três resultados depois (fan-in).
 
-``extrair_distancia`` já usa LLM real (MiniMax-M3 via LangChain); ``extrair_lugar``
-e ``extrair_horario`` seguem mock até serem implementados.
+``extrair_lugar`` e ``extrair_distancia`` já usam LLM real (MiniMax-M3 via
+LangChain); ``extrair_horario`` segue mock até ser implementado.
 """
 
 from __future__ import annotations
@@ -22,6 +22,12 @@ _SYSTEM_DISTANCIA = (
     "Responda apenas com o número em km, usando ponto como separador decimal."
 )
 
+_SYSTEM_LUGAR = (
+    "Você extrai o nome do lugar de partida do percurso a partir do texto do usuário "
+    "(bairro, parque, endereço ou cidade). "
+    "Responda apenas com o nome do lugar, sem explicações."
+)
+
 # MiniMax-M3 é um modelo de raciocínio: emite um bloco <think>...</think> antes
 # da resposta. Removemos esse bloco e extraímos o número do restante.
 _RE_THINK = re.compile(r"<think>.*?</think>", re.DOTALL)
@@ -29,9 +35,14 @@ _RE_NUMERO = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 
 
 def extrair_lugar(estado: EstadoAgentico) -> dict:
-    """Extrai o nome do lugar de partida a partir do texto de entrada."""
-    # TODO: extração real via LLM (LangChain) a partir de ``texto_descritivo``.
-    return {"lugar": "Parque Ibirapuera, São Paulo"}
+    """Extrai o nome do lugar de partida do texto via LangChain + MiniMax-M3."""
+    resposta = get_llm().invoke(
+        [("system", _SYSTEM_LUGAR), ("human", estado["texto_descritivo"])]
+    )
+    lugar = _RE_THINK.sub("", str(resposta.content)).strip().strip("\"'")
+    if not lugar:
+        raise ValueError("Não foi possível extrair o lugar do texto.")
+    return {"lugar": lugar}
 
 
 def extrair_distancia(estado: EstadoAgentico) -> dict:
