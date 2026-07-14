@@ -27,6 +27,15 @@ class RequisitosRota(TypedDict, total=False):
     modalidade: str  # "Corrida de Rua Pedestre" | "Ciclismo Urbano"
 
 
+class DiretrizesClima(TypedDict):
+    """Diretrizes de roteamento extraídas a partir da análise climática."""
+
+    requer_sombra: bool  # Ativado se calor/UV alto
+    risco_chuva: bool  # Ativado se probabilidade de chuva alta
+    vento_forte: bool  # Ativado se vento > limite (ex: 20 km/h)
+    temperatura_extrema: bool  # Ativado se muito frio ou muito quente
+
+
 class EstadoAgentico(TypedDict):
     """Estado compartilhado entre os nós do grafo."""
 
@@ -35,6 +44,15 @@ class EstadoAgentico(TypedDict):
     # Campos extraídos pelos nós de extração paralelos (cada nó escreve o seu).
     lugar: str  # nome do lugar de partida
     distancia_alvo_km: float
-    horario_inicio: str  # data/hora ISO 8601 do início
+    horario_inicio: str  # data/hora ISO 8601 do início (legado/fallback)
+    data_inicio: str  # data da atividade (ex: YYYY-MM-DD)
+    hora_inicio: str  # hora da atividade (ex: HH:MM)
     # Requisitos consolidados pelo Orquestrador.
     requisitos: RequisitosRota | None
+    
+    # Coordenadas geográficas resolvidas pelo geocoding.
+    coordenadas: tuple[float, float] | None
+    
+    # Preenchido pelo Agente 2 (Analista Meteorológico)
+    relatorio_clima: str | None
+    diretrizes_clima: DiretrizesClima | None

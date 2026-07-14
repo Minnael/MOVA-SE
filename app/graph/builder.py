@@ -15,6 +15,7 @@ from app.graph.nodes.extratores import (
     extrair_horario,
     extrair_lugar,
 )
+from app.graph.nodes.meteorologia import analisar_clima
 from app.graph.nodes.orquestrador import consolidar_requisitos
 from app.graph.state import EstadoAgentico
 
@@ -27,6 +28,7 @@ def construir_grafo():
     grafo.add_node("extrair_distancia", extrair_distancia)
     grafo.add_node("extrair_horario", extrair_horario)
     grafo.add_node("orquestrador", consolidar_requisitos)
+    grafo.add_node("analista_meteorologico", analisar_clima)
 
     # Fan-out: os três extratores rodam em paralelo a partir do START.
     grafo.add_edge(START, "extrair_lugar")
@@ -36,6 +38,9 @@ def construir_grafo():
     grafo.add_edge("extrair_lugar", "orquestrador")
     grafo.add_edge("extrair_distancia", "orquestrador")
     grafo.add_edge("extrair_horario", "orquestrador")
-    grafo.add_edge("orquestrador", END)
+    
+    # Orquestrador conecta com o Analista Meteorológico (que rodará em paralelo com o de infraestrutura futuramente)
+    grafo.add_edge("orquestrador", "analista_meteorologico")
+    grafo.add_edge("analista_meteorologico", END)
 
     return grafo.compile()

@@ -36,6 +36,15 @@ def extrair_lugar(estado: EstadoAgentico) -> dict:
 
 def extrair_distancia(estado: EstadoAgentico) -> dict:
     """Extrai a distância-alvo (km) do texto via LangChain + MiniMax-M3."""
+    import os
+    api_key = os.environ.get("MINIMAX_API_KEY")
+    if not api_key or api_key == "dummy_key":
+        # Fallback local sem LLM para desenvolvimento fácil sem chave
+        match = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:km|quilometros|quilômetros)", estado["texto_descritivo"], re.IGNORECASE)
+        if match:
+            return {"distancia_alvo_km": float(match.group(1).replace(",", "."))}
+        return {"distancia_alvo_km": 10.0}
+
     resposta = get_llm().invoke(
         [("system", _SYSTEM_DISTANCIA), ("human", estado["texto_descritivo"])]
     )
