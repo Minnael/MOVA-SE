@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 
+import os
 from langchain_ollama import ChatOllama
 
 from app.graph.state import EstadoAgentico
@@ -15,7 +16,10 @@ from app.graph.state import EstadoAgentico
 
 def redigir_relatorio(estado: EstadoAgentico) -> dict:
     """Consome o estado e gera um relatório com LLM local."""
-    llm = ChatOllama(model="llama3", temperature=0.7)
+    
+    # Busca a URL do Ollama no .env (se não existir, usa o padrão localhost)
+    base_url = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+    llm = ChatOllama(model="llama3", temperature=0.7, base_url=base_url)
 
     requisitos = estado.get("requisitos", {})
     dados_json = json.dumps(requisitos, indent=2, ensure_ascii=False)
