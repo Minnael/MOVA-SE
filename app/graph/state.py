@@ -43,15 +43,12 @@ class EstadoAgentico(TypedDict):
     texto_descritivo: str  # descrição em linguagem natural
     # Campos extraídos pelos nós de extração paralelos (cada nó escreve o seu).
     lugar: str  # nome do lugar de partida
+    coordenadas: tuple[float, float] | None  # (lat, lon) do lugar de partida
     distancia_alvo_km: float
-    horario_inicio: str  # data/hora ISO 8601 do início (legado/fallback)
-    data_inicio: str  # data da atividade (ex: YYYY-MM-DD)
-    hora_inicio: str  # hora da atividade (ex: HH:MM)
+    data_inicio: str  # data resolvida em ISO (YYYY-MM-DD)
+    horario_inicio: str | None  # hora "HH:MM" ou None quando ausente no texto
     # Requisitos consolidados pelo Orquestrador.
     requisitos: RequisitosRota | None
-    
-    # Coordenadas geográficas resolvidas pelo geocoding.
-    coordenadas: tuple[float, float] | None
     
     # Preenchido pelo Agente 2 (Analista Meteorológico)
     relatorio_clima: str | None

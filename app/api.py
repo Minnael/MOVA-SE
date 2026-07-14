@@ -6,7 +6,7 @@ para o grafo de orquestração.
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from app.graph.builder import construir_grafo
@@ -30,5 +30,10 @@ def solicitar_rota(requisicao: RequisicaoRota) -> dict:
 
     Ainda não executa roteamento real: retorna o estado resultante com os
     requisitos consolidados pelo Orquestrador (parte dos campos ainda mocada).
+
+    Erros de extração (ex.: data/horário no passado) viram HTTP 422.
     """
-    return grafo.invoke({"texto_descritivo": requisicao.texto_descritivo})
+    try:
+        return grafo.invoke({"texto_descritivo": requisicao.texto_descritivo})
+    except ValueError as erro:
+        raise HTTPException(status_code=422, detail=str(erro)) from erro
