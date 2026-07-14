@@ -56,3 +56,6 @@ class EstadoAgentico(TypedDict):
     # Preenchido pelo Agente 2 (Analista Meteorológico)
     relatorio_clima: str | None
     diretrizes_clima: DiretrizesClima | None
+
+    # Preenchido pelo Agente 3 (Infraestrutura e Segurança)
+    caminho_grafo: str | None
