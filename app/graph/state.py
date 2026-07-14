@@ -40,3 +40,5 @@ class EstadoAgentico(TypedDict):
     horario_inicio: str | None  # hora "HH:MM" ou None quando ausente no texto
     # Requisitos consolidados pelo Orquestrador.
     requisitos: RequisitosRota | None
+    # Relatório narrativo gerado pelo Agente Comunicador (Ollama).
+    relatorio_narrativo: str | None
