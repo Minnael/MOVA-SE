@@ -37,3 +37,41 @@ The agent updates the shared state with the following keys:
     "temperatura_extrema": false   # Triggered if Temp > 32°C or < 10°C
   }
   ```
+
+---
+
+## Agent Workflow
+
+```mermaid
+graph TD
+    %% Input & Configuration Nodes
+    Start([Start Node: analisar_clima]) --> GetState[Read coordinates & requirements from EstadoAgentico]
+    GetState --> CallOpenMeteo[Call Open-Meteo forecast endpoint]
+    
+    %% Open-Meteo API Processing
+    CallOpenMeteo --> ParseClosest[Find hourly forecast closest to target datetime]
+    ParseClosest --> ExtractMetrics[Extract Temperature, Rain %, UV, and Wind metrics]
+    
+    %% Authentication & Execution Logic
+    ExtractMetrics --> LLMCall{Try calling MiniMax-M3 LLM?}
+    
+    %% LLM Execution Pathway
+    LLMCall -- "API Key Present & Online" --> PromptLLM[Send System Prompt + Weather Metrics to LLM]
+    PromptLLM --> ParseJSONLLM[Clean reasoning tags & parse JSON response]
+    ParseJSONLLM --> UpdateStateLLM[Update relatorio_clima & diretrizes_clima in state]
+    
+    %% Fallback Rule-Engine Pathway
+    LLMCall -- "API Error or Offline" --> FallbackRule[Trigger local Python rule-based fallback]
+    FallbackRule --> ProcessPython[Calculate constraints using fixed thresholds <br>and generate standard summary]
+    ProcessPython --> UpdateStateFallback[Update relatorio_clima & diretrizes_clima in state]
+    
+    %% Termination Nodes
+    UpdateStateLLM --> End([End Node: State Updated])
+    UpdateStateFallback --> End
+    
+    %% Graph Styling
+    style Start fill:#4CAF50,stroke:#388E3C,color:#fff
+    style End fill:#4CAF50,stroke:#388E3C,color:#fff
+    style LLMCall fill:#FF9800,stroke:#F57C00,color:#fff
+    style FallbackRule fill:#f44336,stroke:#d32f2f,color:#fff
+```
