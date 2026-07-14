@@ -17,7 +17,7 @@ def consolidar_requisitos(estado: EstadoAgentico) -> dict:
     """Consolida os campos extraídos em ``requisitos``.
 
     Args:
-        estado: estado agêntico contendo ``lugar``, ``distancia_alvo_km``,
+        estado: estado agêntico contendo ``coordenadas``, ``distancia_alvo_km``,
             ``data_inicio`` e ``horario_inicio`` (produzidos pelos nós de extração).
 
     Returns:
@@ -28,8 +28,10 @@ def consolidar_requisitos(estado: EstadoAgentico) -> dict:
     data, hora = estado["data_inicio"], estado["horario_inicio"]
     janela = f"{data}T{hora}" if hora else data
 
+    lat, lon = estado["coordenadas"]
+
     requisitos: RequisitosRota = {
-        "ponto_partida": estado["lugar"],
+        "ponto_partida": f"{lat}, {lon}",
         "distancia_alvo_km": estado["distancia_alvo_km"],
         "janela_temporal": janela,
         # TODO: ainda mocados; virão de entrada/extração em seguida.

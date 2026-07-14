@@ -34,6 +34,7 @@ class EstadoAgentico(TypedDict):
     texto_descritivo: str  # descrição em linguagem natural
     # Campos extraídos pelos nós de extração paralelos (cada nó escreve o seu).
     lugar: str  # nome do lugar de partida
+    coordenadas: tuple[float, float] | None  # (lat, lon) do lugar de partida
     distancia_alvo_km: float
     data_inicio: str  # data resolvida em ISO (YYYY-MM-DD)
     horario_inicio: str | None  # hora "HH:MM" ou None quando ausente no texto
