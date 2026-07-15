@@ -27,6 +27,15 @@ class RequisitosRota(TypedDict, total=False):
     modalidade: str  # "Corrida de Rua Pedestre" | "Ciclismo Urbano"
 
 
+class DiretrizesClima(TypedDict):
+    """Diretrizes de roteamento extraídas a partir da análise climática."""
+
+    requer_sombra: bool  # Ativado se calor/UV alto
+    risco_chuva: bool  # Ativado se probabilidade de chuva alta
+    vento_forte: bool  # Ativado se vento > limite (ex: 20 km/h)
+    temperatura_extrema: bool  # Ativado se muito frio ou muito quente
+
+
 class EstadoAgentico(TypedDict):
     """Estado compartilhado entre os nós do grafo."""
 
@@ -40,5 +49,12 @@ class EstadoAgentico(TypedDict):
     horario_inicio: str | None  # hora "HH:MM" ou None quando ausente no texto
     # Requisitos consolidados pelo Orquestrador.
     requisitos: RequisitosRota | None
+    # Preenchido pelo Agente 2 (Analista Meteorológico)
+    relatorio_clima: str | None
+    diretrizes_clima: DiretrizesClima | None
+
+    # Preenchido pelo Agente 3 (Infraestrutura e Segurança)
+    caminho_grafo: str | None
+
     # Relatório narrativo gerado pelo Agente Comunicador (Ollama).
     relatorio_narrativo: str | None
