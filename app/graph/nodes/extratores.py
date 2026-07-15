@@ -19,6 +19,7 @@ import dateparser
 
 from app.graph.state import EstadoAgentico
 from app.llm import get_llm
+from app.graph.nodes.geocoordinates_getter import obter_coordenadas
 
 _SYSTEM_DISTANCIA = (
     "Você extrai a distância-alvo do percurso, em quilômetros, do texto do usuário. "
@@ -62,8 +63,14 @@ def extrair_lugar(estado: EstadoAgentico) -> dict:
             estado["texto_descritivo"]
         )
         if match:
-            return {"lugar": match.group(1).strip()}
-        return {"lugar": "Parque Ibirapuera, São Paulo"}
+            lugar = match.group(1).strip()
+        else:
+            lugar = "Parque Ibirapuera, São Paulo"
+            
+        coords = obter_coordenadas(lugar)
+        if not isinstance(coords, tuple):
+            coords = (-23.5874, -46.6576) # Fallback Ibirapuera
+        return {"lugar": lugar, "coordenadas": coords}
 
     resposta = get_llm().invoke(
         [("system", _SYSTEM_LUGAR), ("human", estado["texto_descritivo"])]
@@ -71,7 +78,12 @@ def extrair_lugar(estado: EstadoAgentico) -> dict:
     lugar = _RE_THINK.sub("", str(resposta.content)).strip().strip("\"'")
     if not lugar:
         raise ValueError("Não foi possível extrair o lugar do texto.")
-    return {"lugar": lugar}
+        
+    coords = obter_coordenadas(lugar)
+    if not isinstance(coords, tuple):
+        raise ValueError(f"Não foi possível geocodificar o lugar: {lugar!r}")
+        
+    return {"lugar": lugar, "coordenadas": coords}
 
 
 def extrair_distancia(estado: EstadoAgentico) -> dict:
