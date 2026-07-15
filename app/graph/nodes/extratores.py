@@ -12,6 +12,7 @@ combina o modelo com a biblioteca ``dateparser`` para resolver datas relativas.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import datetime
 
@@ -19,6 +20,8 @@ import dateparser
 
 from app.graph.state import EstadoAgentico
 from app.llm import get_llm
+
+logger = logging.getLogger(__name__)
 
 _SYSTEM_DISTANCIA = (
     "Você extrai a distância-alvo do percurso, em quilômetros, do texto do usuário. "
@@ -54,52 +57,71 @@ _RE_NUMERO = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 def extrair_lugar(estado: EstadoAgentico) -> dict:
     """Extrai o nome do lugar de partida do texto via LangChain + MiniMax-M3."""
     import os
+    logger.info("[extrair_lugar] Iniciando a partir do texto: %r", estado["texto_descritivo"])
     api_key = os.environ.get("MINIMAX_API_KEY")
     if not api_key or api_key == "dummy_key":
+        logger.info("[extrair_lugar] Sem MINIMAX_API_KEY — usando fallback local (regex)")
         # Fallback local sem LLM
         match = re.search(
             r"(?:no|na|em|para o|para a)\s+([A-Z\u00C0-\u00DC][a-zA-Z\u00C0-\u00FC\s',]+?)(?:\s+no|\s+às|\s+as|\s+domingo|\s+sábado|\s+para|$)",
             estado["texto_descritivo"]
         )
         if match:
-            return {"lugar": match.group(1).strip()}
+            lugar = match.group(1).strip()
+            logger.info("[extrair_lugar] (local) lugar=%r", lugar)
+            return {"lugar": lugar}
+        logger.info("[extrair_lugar] (local) sem match — usando padrão %r", "Parque Ibirapuera, São Paulo")
         return {"lugar": "Parque Ibirapuera, São Paulo"}
 
+    logger.info("[extrair_lugar] Chamando LLM MiniMax-M3")
     resposta = get_llm().invoke(
         [("system", _SYSTEM_LUGAR), ("human", estado["texto_descritivo"])]
     )
     lugar = _RE_THINK.sub("", str(resposta.content)).strip().strip("\"'")
     if not lugar:
+        logger.error("[extrair_lugar] LLM não retornou um lugar")
         raise ValueError("Não foi possível extrair o lugar do texto.")
+    logger.info("[extrair_lugar] (LLM) lugar=%r", lugar)
     return {"lugar": lugar}
 
 
 def extrair_distancia(estado: EstadoAgentico) -> dict:
     """Extrai a distância-alvo (km) do texto via LangChain + MiniMax-M3."""
     import os
+    logger.info("[extrair_distancia] Iniciando")
     api_key = os.environ.get("MINIMAX_API_KEY")
     if not api_key or api_key == "dummy_key":
+        logger.info("[extrair_distancia] Sem MINIMAX_API_KEY — usando fallback local (regex)")
         # Fallback local sem LLM para desenvolvimento fácil sem chave
         match = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:km|quilometros|quilômetros)", estado["texto_descritivo"], re.IGNORECASE)
         if match:
-            return {"distancia_alvo_km": float(match.group(1).replace(",", "."))}
+            dist = float(match.group(1).replace(",", "."))
+            logger.info("[extrair_distancia] (local) distancia_alvo_km=%s", dist)
+            return {"distancia_alvo_km": dist}
+        logger.info("[extrair_distancia] (local) sem match — usando padrão 10.0 km")
         return {"distancia_alvo_km": 10.0}
 
+    logger.info("[extrair_distancia] Chamando LLM MiniMax-M3")
     resposta = get_llm().invoke(
         [("system", _SYSTEM_DISTANCIA), ("human", estado["texto_descritivo"])]
     )
     texto = _RE_THINK.sub("", str(resposta.content)).strip()
     match = _RE_NUMERO.search(texto)
     if match is None:
+        logger.error("[extrair_distancia] LLM não retornou número: %r", texto)
         raise ValueError(f"Não foi possível extrair a distância de: {texto!r}")
-    return {"distancia_alvo_km": float(match.group().replace(",", "."))}
+    dist = float(match.group().replace(",", "."))
+    logger.info("[extrair_distancia] (LLM) distancia_alvo_km=%s", dist)
+    return {"distancia_alvo_km": dist}
 
 
 def extrair_horario(estado: EstadoAgentico) -> dict:
     """Extrai data (via dateparser) e hora do texto; rejeita momentos no passado."""
     import os
+    logger.info("[extrair_horario] Iniciando")
     api_key = os.environ.get("MINIMAX_API_KEY")
     if not api_key or api_key == "dummy_key":
+        logger.info("[extrair_horario] Sem MINIMAX_API_KEY — usando fallback local")
         from datetime import timedelta
         # Fallback local sem LLM
         texto = estado["texto_descritivo"].lower()
@@ -126,8 +148,10 @@ def extrair_horario(estado: EstadoAgentico) -> dict:
         elif "amanhã" in texto or "amanha" in texto:
             data = (agora + timedelta(days=1)).date()
 
+        logger.info("[extrair_horario] (local) data=%s hora=%s", data.isoformat(), hora)
         return {"data_inicio": data.isoformat(), "horario_inicio": hora}
 
+    logger.info("[extrair_horario] Chamando LLM MiniMax-M3")
     resposta = get_llm().invoke(
         [("system", _SYSTEM_HORARIO), ("human", estado["texto_descritivo"])]
     )
@@ -161,8 +185,11 @@ def extrair_horario(estado: EstadoAgentico) -> dict:
     # Rejeita momentos no passado.
     if hora:
         if datetime.combine(data, datetime.strptime(hora, "%H:%M").time()) < agora:
+            logger.error("[extrair_horario] Horário no passado: %s %s", data, hora)
             raise ValueError(f"O horário informado está no passado: {data} {hora}")
     elif data < agora.date():
+        logger.error("[extrair_horario] Data no passado: %s", data)
         raise ValueError(f"A data informada está no passado: {data}")
 
+    logger.info("[extrair_horario] (LLM) data=%s hora=%s", data.isoformat(), hora)
     return {"data_inicio": data.isoformat(), "horario_inicio": hora}

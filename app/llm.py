@@ -7,6 +7,7 @@ modelo ficam externalizados aqui, fora do código de negócio.
 
 from __future__ import annotations
 
+import logging
 import os
 from functools import lru_cache
 
@@ -14,6 +15,8 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 MINIMAX_BASE_URL = "https://api.minimax.io/v1"
 MINIMAX_MODEL = "MiniMax-M3"
@@ -26,6 +29,8 @@ def get_llm() -> ChatOpenAI:
     Instanciado sob demanda (não no import) para não exigir a chave só por
     importar o módulo. Cacheado para reutilizar a mesma conexão.
     """
+    tem_chave = bool(os.environ.get("MINIMAX_API_KEY")) and os.environ.get("MINIMAX_API_KEY") != "dummy_key"
+    logger.info("Instanciando cliente LLM %s (chave configurada: %s)", MINIMAX_MODEL, tem_chave)
     return ChatOpenAI(
         model=MINIMAX_MODEL,
         api_key=os.environ.get("MINIMAX_API_KEY", "dummy_key"),

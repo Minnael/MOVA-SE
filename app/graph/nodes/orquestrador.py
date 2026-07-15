@@ -10,7 +10,11 @@ mocados, até que sua entrada/extração seja definida.
 
 from __future__ import annotations
 
+import logging
+
 from app.graph.state import EstadoAgentico, RequisitosRota
+
+logger = logging.getLogger(__name__)
 
 
 def consolidar_requisitos(estado: EstadoAgentico) -> dict:
@@ -25,6 +29,7 @@ def consolidar_requisitos(estado: EstadoAgentico) -> dict:
     """
     # Combina data e hora (estados separados) em uma janela temporal ISO 8601:
     # datetime quando há hora, apenas a data quando ela está ausente.
+    logger.info("[orquestrador] Consolidando requisitos (fan-in)")
     data = estado.get("data_inicio")
     hora = estado.get("horario_inicio")
     janela = f"{data}T{hora}" if hora else data
@@ -39,5 +44,6 @@ def consolidar_requisitos(estado: EstadoAgentico) -> dict:
         "perfil_altimetria": "Moderado",
         "modalidade": "Corrida de Rua Pedestre",
     }
+    logger.info("[orquestrador] Requisitos consolidados: %s", requisitos)
     return {"requisitos": requisitos}
 

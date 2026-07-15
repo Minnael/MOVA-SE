@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 def consultar_open_meteo(lat: float, lon: float, data_hora_iso: str) -> dict:
@@ -20,6 +23,7 @@ def consultar_open_meteo(lat: float, lon: float, data_hora_iso: str) -> dict:
         "timezone": "auto",
     }
 
+    logger.info("Consultando Open-Meteo em (%s, %s) para %s", lat, lon, data_hora_iso)
     response = requests.get(url, params=params, timeout=10)
     response.raise_for_status()
     data = response.json()
@@ -29,9 +33,11 @@ def consultar_open_meteo(lat: float, lon: float, data_hora_iso: str) -> dict:
     times = [datetime.fromisoformat(t) for t in data["hourly"]["time"]]
     closest_idx = min(range(len(times)), key=lambda i: abs((times[i] - target_dt).total_seconds()))
 
-    return {
+    previsao = {
         "temperatura": data["hourly"]["temperature_2m"][closest_idx],
         "chuva_probabilidade": data["hourly"]["precipitation_probability"][closest_idx],
         "indice_uv": data["hourly"]["uv_index"][closest_idx],
         "velocidade_vento": data["hourly"]["wind_speed_10m"][closest_idx],
     }
+    logger.info("Open-Meteo (%s): %s", data["hourly"]["time"][closest_idx], previsao)
+    return previsao

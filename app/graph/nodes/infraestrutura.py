@@ -7,6 +7,7 @@ e salvar o grafo em formato GraphML para o motor matemático de rotas.
 
 from __future__ import annotations
 
+import logging
 import os
 import osmnx as ox
 import networkx as nx
@@ -18,6 +19,8 @@ from app.utils.grafo import (
     determinar_periodo_dia,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def analisar_infraestrutura(estado: EstadoAgentico) -> dict:
     """Baixa o grafo de ruas local, anota as vias com Se e Ie, e salva o arquivo GraphML.
@@ -28,10 +31,12 @@ def analisar_infraestrutura(estado: EstadoAgentico) -> dict:
     Returns:
         Atualização parcial do estado com a chave `caminho_grafo`.
     """
+    logger.info("[infraestrutura] Iniciando análise de infraestrutura (Agente 3)")
     coordenadas = estado.get("coordenadas")
     requisitos = estado.get("requisitos")
 
     if not coordenadas or not requisitos:
+        logger.error("[infraestrutura] Coordenadas ou requisitos ausentes no estado")
         raise ValueError("Coordenadas ou requisitos não definidos no estado.")
 
     lat, lon = coordenadas
@@ -46,14 +51,14 @@ def analisar_infraestrutura(estado: EstadoAgentico) -> dict:
     # Determinar período do dia para cálculo de risco de iluminação
     periodo_dia = determinar_periodo_dia(janela_temporal)
 
-    print(f"Agente 3: Baixando rede '{modalidade}' em um raio de {raio_metros}m...")
+    logger.info("[infraestrutura] Baixando rede '%s' em um raio de %dm (período: %s)...", modalidade, raio_metros, periodo_dia)
 
     try:
         # 1. Download do Grafo real da API Overpass
         G = configurar_e_baixar_grafo(lat, lon, raio_metros, modalidade)
-        print(f"Agente 3: Grafo baixado com {len(G.nodes)} nós e {len(G.edges)} arestas.")
+        logger.info("[infraestrutura] Grafo baixado com %d nós e %d arestas", len(G.nodes), len(G.edges))
     except Exception as e:
-        print(f"Alerta: Falha ao obter grafo do OSM ({e}). Utilizando grafo mock para testes.")
+        logger.warning("[infraestrutura] Falha ao obter grafo do OSM (%s). Utilizando grafo mock para testes.", e)
         # Fallback local para desenvolvimento ágil offline
         G = nx.MultiDiGraph()
         # Nó de origem
@@ -75,7 +80,7 @@ def analisar_infraestrutura(estado: EstadoAgentico) -> dict:
     os.makedirs(pasta_data, exist_ok=True)
     caminho_arquivo = os.path.join(pasta_data, "grafo_local.graphml")
 
-    print(f"Agente 3: Gravando grafo anotado em: {caminho_arquivo}")
+    logger.info("[infraestrutura] Gravando grafo anotado em: %s", caminho_arquivo)
     ox.save_graphml(G, filepath=caminho_arquivo)
 
     return {"caminho_grafo": caminho_arquivo}
