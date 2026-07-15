@@ -35,5 +35,19 @@ Escreva um relatório com 2 a 3 parágrafos curtos explicando a rota, o horário
 Não inclua pensamentos, tags XML, ou textos soltos antes ou depois do relatório. Apenas o relatório final legível.
 """
 
-    resposta = llm.invoke(prompt)
-    return {"relatorio_narrativo": str(resposta.content).strip()}
+    try:
+        resposta = llm.invoke(prompt)
+        return {"relatorio_narrativo": str(resposta.content).strip()}
+    except Exception as e:
+        print(f"Alerta: Erro na chamada do Ollama local ({e}). Usando fallback heurístico.")
+        dist = requisitos.get("distancia_alvo_km", 10.0)
+        ponto = requisitos.get("ponto_partida", "Parque Ibirapuera")
+        horario = requisitos.get("janela_temporal", "08:00")
+        
+        fallback_texto = (
+            f"[Fallback] Olá! Preparado para a sua atividade física?\n\n"
+            f"Sua rota começará em {ponto} com uma distância alvo de {dist} km. "
+            f"O horário programado é {horario}. Lembre-se de conferir as condições "
+            f"físicas e climáticas antes de começar, manter-se hidratado e aproveitar o percurso!"
+        )
+        return {"relatorio_narrativo": fallback_texto}

@@ -53,6 +53,18 @@ _RE_NUMERO = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 
 def extrair_lugar(estado: EstadoAgentico) -> dict:
     """Extrai o nome do lugar de partida do texto via LangChain + MiniMax-M3."""
+    import os
+    api_key = os.environ.get("MINIMAX_API_KEY")
+    if not api_key or api_key == "dummy_key":
+        # Fallback local sem LLM
+        match = re.search(
+            r"(?:no|na|em|para o|para a)\s+([A-Z\u00C0-\u00DC][a-zA-Z\u00C0-\u00FC\s',]+?)(?:\s+no|\s+às|\s+as|\s+domingo|\s+sábado|\s+para|$)",
+            estado["texto_descritivo"]
+        )
+        if match:
+            return {"lugar": match.group(1).strip()}
+        return {"lugar": "Parque Ibirapuera, São Paulo"}
+
     resposta = get_llm().invoke(
         [("system", _SYSTEM_LUGAR), ("human", estado["texto_descritivo"])]
     )
@@ -64,6 +76,15 @@ def extrair_lugar(estado: EstadoAgentico) -> dict:
 
 def extrair_distancia(estado: EstadoAgentico) -> dict:
     """Extrai a distância-alvo (km) do texto via LangChain + MiniMax-M3."""
+    import os
+    api_key = os.environ.get("MINIMAX_API_KEY")
+    if not api_key or api_key == "dummy_key":
+        # Fallback local sem LLM para desenvolvimento fácil sem chave
+        match = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:km|quilometros|quilômetros)", estado["texto_descritivo"], re.IGNORECASE)
+        if match:
+            return {"distancia_alvo_km": float(match.group(1).replace(",", "."))}
+        return {"distancia_alvo_km": 10.0}
+
     resposta = get_llm().invoke(
         [("system", _SYSTEM_DISTANCIA), ("human", estado["texto_descritivo"])]
     )
@@ -76,6 +97,37 @@ def extrair_distancia(estado: EstadoAgentico) -> dict:
 
 def extrair_horario(estado: EstadoAgentico) -> dict:
     """Extrai data (via dateparser) e hora do texto; rejeita momentos no passado."""
+    import os
+    api_key = os.environ.get("MINIMAX_API_KEY")
+    if not api_key or api_key == "dummy_key":
+        from datetime import timedelta
+        # Fallback local sem LLM
+        texto = estado["texto_descritivo"].lower()
+        hora = "08:00"
+        if " 7 " in texto or "às 7" in texto or "as 7" in texto or "7h" in texto:
+            hora = "07:00"
+        elif " 8 " in texto or "às 8" in texto or "as 8" in texto or "8h" in texto:
+            hora = "08:00"
+        elif " 9 " in texto or "às 9" in texto or "as 9" in texto or "9h" in texto:
+            hora = "09:00"
+
+        agora = datetime.now()
+        data = agora.date()
+        if "domingo" in texto:
+            dias = (6 - agora.weekday()) % 7
+            if dias == 0:
+                dias = 7
+            data = (agora + timedelta(days=dias)).date()
+        elif "sábado" in texto or "sabado" in texto:
+            dias = (5 - agora.weekday()) % 7
+            if dias == 0:
+                dias = 7
+            data = (agora + timedelta(days=dias)).date()
+        elif "amanhã" in texto or "amanha" in texto:
+            data = (agora + timedelta(days=1)).date()
+
+        return {"data_inicio": data.isoformat(), "horario_inicio": hora}
+
     resposta = get_llm().invoke(
         [("system", _SYSTEM_HORARIO), ("human", estado["texto_descritivo"])]
     )

@@ -20,3 +20,8 @@ venv/
 .env
 .env.*
 !.env.example
+
+# Cache do OSMnx, dados locais e rascunhos de testes
+cache/
+data/
+scratch/

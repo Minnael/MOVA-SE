@@ -28,7 +28,7 @@ def get_llm() -> ChatOpenAI:
     """
     return ChatOpenAI(
         model=MINIMAX_MODEL,
-        api_key=os.environ["MINIMAX_API_KEY"],
+        api_key=os.environ.get("MINIMAX_API_KEY", "dummy_key"),
         base_url=MINIMAX_BASE_URL,
         temperature=0,  # extração determinística
     )

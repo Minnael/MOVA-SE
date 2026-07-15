@@ -21,11 +21,12 @@ def consolidar_requisitos(estado: EstadoAgentico) -> dict:
             ``data_inicio`` e ``horario_inicio`` (produzidos pelos nós de extração).
 
     Returns:
-        Atualização parcial do estado com a chave ``requisitos``.
+        Atualização parcial do estado com as chaves ``requisitos``.
     """
     # Combina data e hora (estados separados) em uma janela temporal ISO 8601:
     # datetime quando há hora, apenas a data quando ela está ausente.
-    data, hora = estado["data_inicio"], estado["horario_inicio"]
+    data = estado.get("data_inicio")
+    hora = estado.get("horario_inicio")
     janela = f"{data}T{hora}" if hora else data
 
     lat, lon = estado["coordenadas"]
@@ -39,3 +40,4 @@ def consolidar_requisitos(estado: EstadoAgentico) -> dict:
         "modalidade": "Corrida de Rua Pedestre",
     }
     return {"requisitos": requisitos}
+
