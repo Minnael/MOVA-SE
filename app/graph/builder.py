@@ -20,6 +20,7 @@ from app.graph.nodes.infraestrutura import analisar_infraestrutura
 from app.graph.nodes.meteorologia import analisar_clima
 from app.graph.nodes.geocoordinates_getter import geocodificar
 from app.graph.nodes.orquestrador import consolidar_requisitos
+from app.graph.nodes.comunicador import redigir_relatorio
 from app.graph.state import EstadoAgentico
 
 
@@ -34,6 +35,7 @@ def construir_grafo():
     grafo.add_node("orquestrador", consolidar_requisitos, defer=True)
     grafo.add_node("analista_meteorologico", analisar_clima)
     grafo.add_node("analista_infraestrutura", analisar_infraestrutura)
+    grafo.add_node("comunicador", redigir_relatorio)
 
     # Fan-out: os três extratores rodam em paralelo a partir do START.
     grafo.add_edge(START, "extrair_lugar")
@@ -50,8 +52,11 @@ def construir_grafo():
     grafo.add_edge("orquestrador", "analista_meteorologico")
     grafo.add_edge("orquestrador", "analista_infraestrutura")
     
-    # Fan-in: Ambos convergem ao END
-    grafo.add_edge("analista_meteorologico", END)
-    grafo.add_edge("analista_infraestrutura", END)
+    # Fan-in: Ambos convergem ao Comunicador
+    grafo.add_edge("analista_meteorologico", "comunicador")
+    grafo.add_edge("analista_infraestrutura", "comunicador")
+    
+    # Comunicador encerra o fluxo
+    grafo.add_edge("comunicador", END)
 
     return grafo.compile()

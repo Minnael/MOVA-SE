@@ -49,10 +49,12 @@ class EstadoAgentico(TypedDict):
     horario_inicio: str | None  # hora "HH:MM" ou None quando ausente no texto
     # Requisitos consolidados pelo Orquestrador.
     requisitos: RequisitosRota | None
-    
     # Preenchido pelo Agente 2 (Analista Meteorológico)
     relatorio_clima: str | None
     diretrizes_clima: DiretrizesClima | None
 
     # Preenchido pelo Agente 3 (Infraestrutura e Segurança)
     caminho_grafo: str | None
+
+    # Relatório narrativo gerado pelo Agente Comunicador (Ollama).
+    relatorio_narrativo: str | None
