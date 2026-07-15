@@ -37,3 +37,36 @@ def solicitar_rota(requisicao: RequisicaoRota) -> dict:
         return grafo.invoke({"texto_descritivo": requisicao.texto_descritivo})
     except ValueError as erro:
         raise HTTPException(status_code=422, detail=str(erro)) from erro
+
+
+from app.graph.nodes.comunicador import redigir_relatorio
+from app.graph.state import EstadoAgentico
+
+@app.post("/teste-agente5")
+def testar_agente5_isolado() -> dict:
+    """Rota criada para testar APENAS o Agente 5 (Ollama) e a conexão do servidor.
+    
+    Ignora os agentes da nuvem (MiniMax), usando dados fictícios fixos. 
+    Ideal para você e sua equipe testarem o Ngrok e a sua placa de vídeo sem gastar tokens.
+    """
+    estado_ficticio: EstadoAgentico = {
+        "texto_descritivo": "teste isolado",
+        "lugar": "Avenida Paulista",
+        "coordenadas": (-23.561, -46.656),
+        "distancia_alvo_km": 5.0,
+        "data_inicio": "2026-07-15",
+        "horario_inicio": "18:00",
+        "requisitos": {
+            "ponto_partida": "-23.561, -46.656",
+            "distancia_alvo_km": 5.0,
+            "janela_temporal": "2026-07-15T18:00",
+            "perfil_altimetria": "Moderado",
+            "modalidade": "Corrida de Rua Pedestre"
+        }
+    }
+    
+    # Aciona diretamente a sua GPU (Ollama) passando por cima de todo o resto
+    resultado = redigir_relatorio(estado_ficticio)
+    estado_ficticio["relatorio_narrativo"] = resultado["relatorio_narrativo"]
+    
+    return estado_ficticio

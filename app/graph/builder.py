@@ -18,6 +18,7 @@ from app.graph.nodes.extratores import (
 )
 from app.graph.nodes.geocoordinates_getter import geocodificar
 from app.graph.nodes.orquestrador import consolidar_requisitos
+from app.graph.nodes.comunicador import redigir_relatorio
 from app.graph.state import EstadoAgentico
 
 
@@ -32,6 +33,7 @@ def construir_grafo():
     # defer=True: adia a consolidação até todos os ramos terminarem — inclusive
     # o de geocodificação, que é um nível mais fundo que distância/horário.
     grafo.add_node("orquestrador", consolidar_requisitos, defer=True)
+    grafo.add_node("comunicador", redigir_relatorio)
 
     # Fan-out: os três extratores rodam em paralelo a partir do START.
     grafo.add_edge(START, "extrair_lugar")
@@ -43,6 +45,7 @@ def construir_grafo():
     grafo.add_edge("geocodificar", "orquestrador")
     grafo.add_edge("extrair_distancia", "orquestrador")
     grafo.add_edge("extrair_horario", "orquestrador")
-    grafo.add_edge("orquestrador", END)
+    grafo.add_edge("orquestrador", "comunicador")
+    grafo.add_edge("comunicador", END)
 
     return grafo.compile()
