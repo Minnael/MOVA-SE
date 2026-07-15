@@ -35,14 +35,28 @@ def consolidar_requisitos(estado: EstadoAgentico) -> dict:
     janela = f"{data}T{hora}" if hora else data
 
     lat, lon = estado["coordenadas"]
+    texto = estado.get("texto_descritivo", "").lower()
+    
+    # Heurística para Modalidade
+    if "bicicleta" in texto or "bike" in texto or "ciclismo" in texto or "pedalar" in texto:
+        modalidade = "Ciclismo Urbano"
+    else:
+        modalidade = "Corrida de Rua Pedestre"
+        
+    # Heurística para Perfil de Altimetria
+    if "plano" in texto or "reta" in texto:
+        altimetria = "Plano"
+    elif "montanhoso" in texto or "morro" in texto or "subida" in texto or "ladeira" in texto or "força" in texto:
+        altimetria = "Montanhoso"
+    else:
+        altimetria = "Moderado"
 
     requisitos: RequisitosRota = {
         "ponto_partida": f"{lat}, {lon}",
         "distancia_alvo_km": estado["distancia_alvo_km"],
         "janela_temporal": janela,
-        # TODO: ainda mocados; virão de entrada/extração em seguida.
-        "perfil_altimetria": "Moderado",
-        "modalidade": "Corrida de Rua Pedestre",
+        "perfil_altimetria": altimetria,
+        "modalidade": modalidade,
     }
     logger.info("[orquestrador] Requisitos consolidados: %s", requisitos)
     return {"requisitos": requisitos}

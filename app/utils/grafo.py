@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-import os
+import urllib.request
+import json
+import math
+import time
 import osmnx as ox
 import networkx as nx
 
@@ -45,7 +48,76 @@ def configurar_e_baixar_grafo(lat: float, lon: float, raio_metros: int, modalida
 
     # Baixa o grafo viário usando OSMnx
     G = ox.graph_from_point((lat, lon), dist=raio_metros, network_type=tipo_rede)
+    
+    # Adiciona altimetria via Open-Meteo
+    adicionar_altimetria_grafo(G)
+    
     return G
+
+def adicionar_altimetria_grafo(G: nx.MultiDiGraph) -> None:
+    """Busca a elevação dos nós via Open-Meteo e calcula a inclinação (grade) das arestas."""
+    nodes = list(G.nodes(data=True))
+    batch_size = 100
+    
+    api_bloqueada = False  # Circuit breaker para parar de tentar se levar 429
+    
+    for i in range(0, len(nodes), batch_size):
+        batch = nodes[i:i+batch_size]
+        
+        if api_bloqueada:
+            # Se a API nos bloqueou, apenas zero a elevação para não travar o processo
+            for node, data in batch:
+                data["elevation"] = 0.0
+            continue
+            
+        lats = ",".join(str(round(data["y"], 5)) for node, data in batch)
+        lons = ",".join(str(round(data["x"], 5)) for node, data in batch)
+        url = f"https://api.open-meteo.com/v1/elevation?latitude={lats}&longitude={lons}"
+        
+        sucesso = False
+        tentativas = 0
+        while not sucesso and tentativas < 2:
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'MOVA-SE/1.0'})
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    result = json.loads(response.read().decode())
+                    elevations = result.get("elevation", [])
+                    for idx, (node, data) in enumerate(batch):
+                        if idx < len(elevations):
+                            data["elevation"] = elevations[idx]
+                        else:
+                            data["elevation"] = 0.0
+                sucesso = True
+                time.sleep(0.3)  # Evita 429 Too Many Requests
+            except Exception as e:
+                tentativas += 1
+                erro_str = str(e)
+                if "429" in erro_str:
+                    print(f"Alerta: Limite de requisições do Open-Meteo atingido (429). Interrompendo busca de altimetria para acelerar.")
+                    api_bloqueada = True
+                    sucesso = True # Finge sucesso para sair do while
+                    for node, data in batch:
+                        data["elevation"] = 0.0
+                    break
+                
+                if tentativas == 2:
+                    print(f"Erro ao buscar altimetria para lote de {len(batch)} nós após {tentativas} tentativas: {e}")
+                    for node, data in batch:
+                        data["elevation"] = 0.0
+                else:
+                    time.sleep(1.0) # Espera mais tempo antes do retry
+                
+    # Calcula o grau de inclinação (grade) das arestas
+    for u, v, k, data in G.edges(keys=True, data=True):
+        elev_u = G.nodes[u].get("elevation", 0.0)
+        elev_v = G.nodes[v].get("elevation", 0.0)
+        length = float(data.get("length", 1.0))
+        if length > 0:
+            grade = (elev_v - elev_u) / length
+        else:
+            grade = 0.0
+        data["grade_abs"] = abs(grade)
+        data["grade"] = grade
 
 
 def calcular_atributos_grafo(G: nx.MultiDiGraph, modalidade: str, periodo_dia: str) -> None:

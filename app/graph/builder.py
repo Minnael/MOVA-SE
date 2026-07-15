@@ -23,6 +23,7 @@ from app.graph.nodes.meteorologia import analisar_clima
 from app.graph.nodes.geocoordinates_getter import geocodificar
 from app.graph.nodes.geocoordinates_fallback import buscar_coordenadas_internet
 from app.graph.nodes.orquestrador import consolidar_requisitos
+from app.graph.nodes.roteamento import aplicar_motor_roteamento
 from app.graph.nodes.comunicador import redigir_relatorio
 from app.graph.state import EstadoAgentico
 
@@ -48,7 +49,7 @@ def construir_grafo():
     grafo.add_node("geocodificar_fallback", buscar_coordenadas_internet)
     grafo.add_node("extrair_distancia", extrair_distancia)
     grafo.add_node("extrair_horario", extrair_horario)
-    grafo.add_node("orquestrador", consolidar_requisitos, defer=True)
+    grafo.add_node("orquestrador", consolidar_requisitos)
     grafo.add_node("analista_meteorologico", analisar_clima)
     grafo.add_node("analista_infraestrutura", analisar_infraestrutura)
     grafo.add_node("comunicador", redigir_relatorio)
@@ -57,8 +58,10 @@ def construir_grafo():
     grafo.add_edge(START, "extrair_lugar")
     grafo.add_edge(START, "extrair_distancia")
     grafo.add_edge(START, "extrair_horario")
+    
     # O lugar extraído é geocodificado antes de chegar ao Orquestrador.
     grafo.add_edge("extrair_lugar", "geocodificar")
+    
     # Se a geocodificação restrita à caixa falhar, desvia ao fallback (busca
     # ampla na internet + validação da caixa); senão segue ao Orquestrador.
     grafo.add_conditional_edges(
@@ -67,7 +70,8 @@ def construir_grafo():
         ["orquestrador", "geocodificar_fallback"],
     )
     grafo.add_edge("geocodificar_fallback", "orquestrador")
-    # Fan-in: o Orquestrador só executa após os três ramos terminarem.
+    
+    # Fan-in: o Orquestrador só executa após os outros ramos terminarem.
     grafo.add_edge("extrair_distancia", "orquestrador")
     grafo.add_edge("extrair_horario", "orquestrador")
     
@@ -75,9 +79,13 @@ def construir_grafo():
     grafo.add_edge("orquestrador", "analista_meteorologico")
     grafo.add_edge("orquestrador", "analista_infraestrutura")
     
-    # Fan-in: Ambos convergem ao Comunicador
-    grafo.add_edge("analista_meteorologico", "comunicador")
-    grafo.add_edge("analista_infraestrutura", "comunicador")
+    # Fan-in 1: Ambos convergem ao Motor de Roteamento (Agente 4)
+    grafo.add_node("motor_roteamento", aplicar_motor_roteamento)
+    grafo.add_edge("analista_meteorologico", "motor_roteamento")
+    grafo.add_edge("analista_infraestrutura", "motor_roteamento")
+    
+    # Linear: Motor de Roteamento conecta ao Comunicador (Agente 5)
+    grafo.add_edge("motor_roteamento", "comunicador")
     
     # Comunicador encerra o fluxo
     grafo.add_edge("comunicador", END)

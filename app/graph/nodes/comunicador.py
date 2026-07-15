@@ -21,10 +21,10 @@ _RE_THINK = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 _SYSTEM_PROMPT = (
     "Você gera um relatório narrativo em português, amigável e motivador, para um atleta, "
-    "com base nos dados da rota planejada. "
-    "Escreva um relatório com 2 a 3 parágrafos curtos explicando a rota, o horário, a distância "
-    "e dando dicas de preparação relacionadas ao treino (aquecimento, alongamento, ritmo, "
-    "respiração, hidratação, vestuário). "
+    "com base nos dados da rota planejada e da previsão do tempo. "
+    "Escreva um relatório com 2 a 3 parágrafos curtos explicando a rota, o horário, a distância, "
+    "dando dicas de preparação relacionadas ao treino e dicas de saúde/segurança baseadas no clima. "
+    "Informe também de maneira clara que o mapa detalhado com a infraestrutura foi gerado (mencionando o caminho do arquivo). "
     "NÃO fale sobre alimentação, refeições ou nutrição. "
     "NÃO cite o nome de nenhum sistema, marca ou aplicativo (por exemplo, 'MOVA-SE'). "
     "Não inclua pensamentos, tags XML, títulos, nem textos soltos antes ou depois do relatório. "
@@ -38,8 +38,21 @@ def redigir_relatorio(estado: EstadoAgentico) -> dict:
     logger.info("[comunicador] Iniciando redação do relatório (Agente 5, MiniMax)")
 
     requisitos = estado.get("requisitos", {})
-    dados_json = json.dumps(requisitos, indent=2, ensure_ascii=False)
-    prompt_usuario = f"DADOS DA ROTA:\n{dados_json}"
+    clima = estado.get("relatorio_clima", "Sem dados de clima.")
+    diretrizes = estado.get("diretrizes_clima", {})
+    grafo_path = estado.get("caminho_mapa_html", "Grafo não gerado.")
+    distancia_real = estado.get("distancia_real_calculada", requisitos.get("distancia_alvo_km"))
+
+    dados_consolidados = {
+        "requisitos_base": requisitos,
+        "previsao_clima": clima,
+        "alertas_seguranca_climatica": diretrizes,
+        "distancia_efetiva_da_rota_km": distancia_real,
+        "arquivo_rota_viaria": grafo_path
+    }
+    
+    dados_json = json.dumps(dados_consolidados, indent=2, ensure_ascii=False)
+    prompt_usuario = f"DADOS DA ROTA E CLIMA:\n{dados_json}"
 
     try:
         logger.info("[comunicador] Chamando LLM MiniMax-M3")
@@ -51,14 +64,17 @@ def redigir_relatorio(estado: EstadoAgentico) -> dict:
         return {"relatorio_narrativo": texto}
     except Exception as e:
         logger.warning("[comunicador] Erro na chamada do MiniMax (%s). Usando fallback heurístico.", e)
-        dist = requisitos.get("distancia_alvo_km", 10.0)
+        dist = estado.get("distancia_real_calculada", requisitos.get("distancia_alvo_km", 10.0))
         ponto = requisitos.get("ponto_partida", "Parque Ibirapuera")
         horario = requisitos.get("janela_temporal", "08:00")
+        clima_resumo = estado.get("relatorio_clima", "Verifique as condições climáticas locais.")
 
         fallback_texto = (
             f"[Fallback] Olá! Preparado para a sua atividade física?\n\n"
             f"Sua rota começará em {ponto} com uma distância alvo de {dist} km. "
-            f"O horário programado é {horario}. Lembre-se de conferir as condições "
-            f"físicas e climáticas antes de começar, manter-se hidratado e aproveitar o percurso!"
+            f"O horário programado é {horario}.\n\n"
+            f"Previsão do Tempo: {clima_resumo}\n\n"
+            f"O mapa com a análise da infraestrutura viária foi gerado com sucesso para a sua segurança. "
+            f"Mantenha-se hidratado e aproveite o percurso!"
         )
         return {"relatorio_narrativo": fallback_texto}
