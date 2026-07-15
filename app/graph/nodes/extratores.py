@@ -19,7 +19,8 @@ import dateparser
 
 from app.graph.state import EstadoAgentico
 from app.llm import get_llm
-from app.graph.nodes.geocoordinates_getter import obter_coordenadas
+
+logger = logging.getLogger(__name__)
 
 _SYSTEM_DISTANCIA = (
     "Você extrai a distância-alvo do percurso, em quilômetros, do texto do usuário. "
@@ -55,6 +56,7 @@ _RE_NUMERO = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 def extrair_lugar(estado: EstadoAgentico) -> dict:
     """Extrai o nome do lugar de partida do texto via LangChain + MiniMax-M3."""
     import os
+    logger.info("[extrair_lugar] Iniciando a partir do texto: %r", estado["texto_descritivo"])
     api_key = os.environ.get("MINIMAX_API_KEY")
     if not api_key or api_key == "dummy_key":
         # Fallback local sem LLM
@@ -64,13 +66,10 @@ def extrair_lugar(estado: EstadoAgentico) -> dict:
         )
         if match:
             lugar = match.group(1).strip()
-        else:
-            lugar = "Parque Ibirapuera, São Paulo"
-            
-        coords = obter_coordenadas(lugar)
-        if not isinstance(coords, tuple):
-            coords = (-23.5874, -46.6576) # Fallback Ibirapuera
-        return {"lugar": lugar, "coordenadas": coords}
+            logger.info("[extrair_lugar] (local) lugar=%r", lugar)
+            return {"lugar": lugar}
+        logger.info("[extrair_lugar] (local) sem match — usando padrão %r", "Parque Ibirapuera, São Paulo")
+        return {"lugar": "Parque Ibirapuera, São Paulo"}
 
     resposta = get_llm().invoke(
         [("system", _SYSTEM_LUGAR), ("human", estado["texto_descritivo"])]
@@ -79,11 +78,8 @@ def extrair_lugar(estado: EstadoAgentico) -> dict:
     if not lugar:
         raise ValueError("Não foi possível extrair o lugar do texto.")
         
-    coords = obter_coordenadas(lugar)
-    if not isinstance(coords, tuple):
-        raise ValueError(f"Não foi possível geocodificar o lugar: {lugar!r}")
-        
-    return {"lugar": lugar, "coordenadas": coords}
+    logger.info("[extrair_lugar] (LLM) lugar=%r", lugar)
+    return {"lugar": lugar}
 
 
 def extrair_distancia(estado: EstadoAgentico) -> dict:
