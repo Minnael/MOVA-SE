@@ -8,11 +8,14 @@ qualitativa (alertas de saúde) e diretrizes quantitativas (sombra, vento, chuva
 from __future__ import annotations
 
 import json
+import logging
 import re
 
 from app.graph.state import EstadoAgentico
 from app.llm import get_llm
 from app.utils.clima import consultar_open_meteo
+
+logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = (
     "Você é o Analista Meteorológico do sistema MOVA-SE. "
@@ -45,10 +48,12 @@ def analisar_clima(estado: EstadoAgentico) -> dict:
     Returns:
         Atualização parcial do estado com as chaves `relatorio_clima` e `diretrizes_clima`.
     """
+    logger.info("[meteorologia] Iniciando análise climática (Agente 2)")
     coordenadas = estado.get("coordenadas")
     requisitos = estado.get("requisitos")
 
     if not coordenadas or not requisitos:
+        logger.error("[meteorologia] Coordenadas ou requisitos ausentes no estado")
         raise ValueError("Coordenadas ou requisitos não definidos no estado.")
 
     lat, lon = coordenadas
@@ -71,6 +76,7 @@ def analisar_clima(estado: EstadoAgentico) -> dict:
 
     try:
         # 3. Chamar a LLM
+        logger.info("[meteorologia] Chamando LLM para análise do clima")
         resposta = get_llm().invoke(
             [("system", _SYSTEM_PROMPT), ("human", prompt_usuario)]
         )
@@ -84,9 +90,10 @@ def analisar_clima(estado: EstadoAgentico) -> dict:
         texto_llm = re.sub(r"\s*```$", "", texto_llm).strip()
 
         dados_analise = json.loads(texto_llm)
+        logger.info("[meteorologia] Análise via LLM concluída")
     except Exception as e:
         # Fallback robusto via heurística caso a LLM falhe ou não tenha API Key
-        print(f"Alerta: Erro na chamada da LLM ({e}). Usando fallback heurístico (Python puro).")
+        logger.warning("[meteorologia] Erro na LLM (%s). Usando fallback heurístico (Python puro).", e)
         dados_analise = {
             "resumo": (
                 f"Previsão de tempo para o treino: temperatura de {dados_clima['temperatura']}°C, "
@@ -101,6 +108,7 @@ def analisar_clima(estado: EstadoAgentico) -> dict:
             },
         }
 
+    logger.info("[meteorologia] Diretrizes climáticas: %s", dados_analise["diretrizes"])
     return {
         "relatorio_clima": dados_analise["resumo"],
         "diretrizes_clima": dados_analise["diretrizes"],

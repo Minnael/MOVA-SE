@@ -6,10 +6,14 @@ para o grafo de orquestração.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from app.graph.builder import construir_grafo
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="MOVA-SE")
 
@@ -33,9 +37,13 @@ def solicitar_rota(requisicao: RequisicaoRota) -> dict:
 
     Erros de extração (ex.: data/horário no passado) viram HTTP 422.
     """
+    logger.info("[API] Nova requisição de rota: %r", requisicao.texto_descritivo)
     try:
-        return grafo.invoke({"texto_descritivo": requisicao.texto_descritivo})
+        resultado = grafo.invoke({"texto_descritivo": requisicao.texto_descritivo})
+        logger.info("[API] Rota processada com sucesso")
+        return resultado
     except ValueError as erro:
+        logger.warning("[API] Requisição rejeitada (422): %s", erro)
         raise HTTPException(status_code=422, detail=str(erro)) from erro
 
 
@@ -44,10 +52,12 @@ from app.graph.state import EstadoAgentico
 
 @app.post("/teste-agente5")
 def testar_agente5_isolado() -> dict:
-    """Rota criada para testar APENAS o Agente 5 (Ollama) e a conexão do servidor.
-    
-    Ignora os agentes da nuvem (MiniMax), usando dados fictícios fixos. 
-    Ideal para você e sua equipe testarem o Ngrok e a sua placa de vídeo sem gastar tokens.
+    """Rota criada para testar APENAS o Agente 5 (Comunicador / MiniMax) e a conexão do servidor.
+
+    Ignora os demais agentes, usando dados fictícios fixos, e aciona diretamente
+    o Comunicador. Atenção: o Agente 5 agora usa o MiniMax (cloud), então esta
+    rota **consome tokens** — requer ``MINIMAX_API_KEY`` configurada (sem ela,
+    cai no fallback heurístico).
     """
     estado_ficticio: EstadoAgentico = {
         "texto_descritivo": "teste isolado",
@@ -65,7 +75,7 @@ def testar_agente5_isolado() -> dict:
         }
     }
     
-    # Aciona diretamente a sua GPU (Ollama) passando por cima de todo o resto
+    # Aciona diretamente o Comunicador (MiniMax) passando por cima de todo o resto
     resultado = redigir_relatorio(estado_ficticio)
     estado_ficticio["relatorio_narrativo"] = resultado["relatorio_narrativo"]
     
