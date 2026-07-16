@@ -34,7 +34,18 @@ def consolidar_requisitos(estado: EstadoAgentico) -> dict:
     hora = estado.get("horario_inicio")
     janela = f"{data}T{hora}" if hora else data
 
-    lat, lon = estado["coordenadas"]
+    coordenadas = estado.get("coordenadas")
+    if isinstance(coordenadas, tuple) and len(coordenadas) == 2:
+        lat, lon = coordenadas
+    elif isinstance(coordenadas, list) and len(coordenadas) == 2:
+        lat, lon = coordenadas[0], coordenadas[1]
+    else:
+        logger.error("[orquestrador] Coordenadas ausentes ou inválidas: %r", coordenadas)
+        raise ValueError(
+            "Não foi possível determinar as coordenadas do ponto de partida. "
+            "Verifique se o lugar informado é válido."
+        )
+        
     texto = estado.get("texto_descritivo", "").lower()
     
     # Heurística para Modalidade
@@ -53,7 +64,7 @@ def consolidar_requisitos(estado: EstadoAgentico) -> dict:
 
     requisitos: RequisitosRota = {
         "ponto_partida": f"{lat}, {lon}",
-        "distancia_alvo_km": estado["distancia_alvo_km"],
+        "distancia_alvo_km": estado.get("distancia_alvo_km", 10.0),
         "janela_temporal": janela,
         "perfil_altimetria": altimetria,
         "modalidade": modalidade,

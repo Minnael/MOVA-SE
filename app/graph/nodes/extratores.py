@@ -55,13 +55,20 @@ _RE_NUMERO = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
 
 
 def extrair_lugar(estado: EstadoAgentico) -> dict:
-    """Extrai o nome do lugar de partida do texto via LangChain + MiniMax-M3."""
+    """Extrai o nome do lugar e geocodifica em coordenadas (lat, lon).
+    
+    Combina extração do nome + geocodificação em um único nó para garantir
+    que o fan-in do LangGraph receba as coordenadas antes de disparar o
+    orquestrador.
+    """
     import os
+    from app.graph.nodes.geocoordinates_getter import obter_coordenadas
+    from app.graph.nodes.geocoordinates_fallback import buscar_coordenadas_internet
+    
     logger.info("[extrair_lugar] Iniciando a partir do texto: %r", estado["texto_descritivo"])
     api_key = os.environ.get("MINIMAX_API_KEY")
     if not api_key or api_key == "dummy_key":
         logger.info("[extrair_lugar] Sem MINIMAX_API_KEY — usando fallback local (regex)")
-        # Fallback local sem LLM
         match = re.search(
             r"(?:no|na|em|para o|para a)\s+([A-Z\u00C0-\u00DC][a-zA-Z\u00C0-\u00FC\s',]+?)(?:\s+no|\s+às|\s+as|\s+domingo|\s+sábado|\s+para|$)",
             estado["texto_descritivo"]
@@ -69,20 +76,31 @@ def extrair_lugar(estado: EstadoAgentico) -> dict:
         if match:
             lugar = match.group(1).strip()
             logger.info("[extrair_lugar] (local) lugar=%r", lugar)
-            return {"lugar": lugar}
-        logger.info("[extrair_lugar] (local) sem match — usando padrão %r", "Parque Ibirapuera, São Paulo")
-        return {"lugar": "Parque Ibirapuera, São Paulo"}
-
-    logger.info("[extrair_lugar] Chamando LLM MiniMax-M3")
-    resposta = get_llm().invoke(
-        [("system", _SYSTEM_LUGAR), ("human", estado["texto_descritivo"])]
-    )
-    lugar = _RE_THINK.sub("", str(resposta.content)).strip().strip("\"'")
-    if not lugar:
-        logger.error("[extrair_lugar] LLM não retornou um lugar")
-        raise ValueError("Não foi possível extrair o lugar do texto.")
-    logger.info("[extrair_lugar] (LLM) lugar=%r", lugar)
-    return {"lugar": lugar}
+        else:
+            lugar = "Parque Ibirapuera, São Paulo"
+            logger.info("[extrair_lugar] (local) sem match — usando padrão %r", lugar)
+    else:
+        logger.info("[extrair_lugar] Chamando LLM MiniMax-M3")
+        resposta = get_llm().invoke(
+            [("system", _SYSTEM_LUGAR), ("human", estado["texto_descritivo"])]
+        )
+        lugar = _RE_THINK.sub("", str(resposta.content)).strip().strip("\"'")
+        if not lugar:
+            logger.error("[extrair_lugar] LLM não retornou um lugar")
+            raise ValueError("Não foi possível extrair o lugar do texto.")
+        logger.info("[extrair_lugar] (LLM) lugar=%r", lugar)
+    
+    # Geocodificação: tenta bounding box, depois fallback
+    logger.info("[extrair_lugar] Geocodificando %r...", lugar)
+    coords = obter_coordenadas(lugar)
+    if isinstance(coords, tuple):
+        logger.info("[extrair_lugar] Coordenadas encontradas: %s", coords)
+        return {"lugar": lugar, "coordenadas": coords}
+    
+    logger.info("[extrair_lugar] Não encontrado na caixa — acionando fallback")
+    resultado_fallback = buscar_coordenadas_internet({"lugar": lugar})
+    logger.info("[extrair_lugar] Fallback retornou: %s", resultado_fallback.get("coordenadas"))
+    return {"lugar": lugar, "coordenadas": resultado_fallback["coordenadas"]}
 
 
 def extrair_distancia(estado: EstadoAgentico) -> dict:

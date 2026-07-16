@@ -59,6 +59,7 @@ class EstadoAgentico(TypedDict):
     # Preenchido pelo Agente 4 (Matemático de Redes)
     coordenadas_rota: list[tuple[float, float]] | None
     caminho_mapa_html: str | None
+    caminho_mapa_img: str | None
     distancia_real_calculada: float | None
 
     # Relatório narrativo gerado pelo Agente Comunicador (Ollama).

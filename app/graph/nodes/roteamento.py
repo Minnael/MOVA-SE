@@ -57,14 +57,17 @@ def aplicar_motor_roteamento(estado: EstadoAgentico) -> dict:
         
     # 3. Busca do Destino (ponto de retorno)
     orig_node = ox.distance.nearest_nodes(G, X=lon, Y=lat)
-    target_dist = distancia_alvo / 2.0
+    
+    # Reduzimos o alvo para 45% da distância porque o caminho de volta (sendo um circuito que evita a ida) 
+    # tende a ser geometricamente mais longo que a ida.
+    target_dist = distancia_alvo * 0.45 
     
     lengths = nx.single_source_dijkstra_path_length(G, orig_node, weight="length")
     
     best_node = None
     best_diff = float("inf")
     
-    # Encontrar o nó mais próximo da metade da distância alvo
+    # Encontrar o nó mais próximo do target_dist
     for node, dist in lengths.items():
         if node != orig_node:
             diff = abs(dist - target_dist)
@@ -76,10 +79,28 @@ def aplicar_motor_roteamento(estado: EstadoAgentico) -> dict:
         best_node = orig_node
         
     # 4. Cálculo da Rota Otimizada em Circuito (Loop Heuristic)
+    def obter_distancia_caminho(caminho):
+        dist = 0.0
+        for i in range(len(caminho) - 1):
+            u, v = caminho[i], caminho[i+1]
+            edges = G.get_edge_data(u, v)
+            if edges:
+                dist += min([float(d.get("length", 0.0)) for d in edges.values()])
+        return dist
+
     try:
         rota_ida = nx.shortest_path(G, orig_node, best_node, weight="peso_roteamento")
+        dist_ida = obter_distancia_caminho(rota_ida)
+        
+        # Se as penalidades de segurança forçaram um desvio maior que 25% do ideal,
+        # ignoramos a segurança e focamos em manter a distância correta.
+        if dist_ida > target_dist * 1.25:
+            rota_ida = nx.shortest_path(G, orig_node, best_node, weight="length")
+            dist_ida = obter_distancia_caminho(rota_ida)
+            
     except nx.NetworkXNoPath:
         rota_ida = [orig_node]
+        dist_ida = 0.0
         
     # Penalizar as arestas da ida para forçar um caminho de volta diferente (Circuito Fechado)
     G_volta = G.copy()
@@ -89,20 +110,25 @@ def aplicar_motor_roteamento(estado: EstadoAgentico) -> dict:
             v = rota_ida[i+1]
             if G_volta.has_edge(u, v):
                 for k in G_volta[u][v]:
-                    G_volta[u][v][k]["peso_roteamento"] *= 100.0  # Punição severa
-            # Caso seja grafo direcionado e a via tenha sentido duplo, punimos a volta também
+                    G_volta[u][v][k]["peso_roteamento"] *= 2.0  
             if G_volta.has_edge(v, u):
                 for k in G_volta[v][u]:
-                    G_volta[v][u][k]["peso_roteamento"] *= 100.0
+                    G_volta[v][u][k]["peso_roteamento"] *= 2.0
             
     try:
         rota_volta = nx.shortest_path(G_volta, best_node, orig_node, weight="peso_roteamento")
+        dist_volta = obter_distancia_caminho(rota_volta)
+        
+        # Se a malha viária for muito fechada e a volta gerada para evitar a ida 
+        # for desproporcionalmente maior (> 1.25x), aborta o circuito e foca na distância
+        if dist_volta > (dist_ida * 1.25):
+            print("Agente 4: Alerta - Circuito longo demais. Forçando caminho mais curto.")
+            rota_volta = nx.shortest_path(G, best_node, orig_node, weight="length")
+            
     except nx.NetworkXNoPath:
         try:
-            # Fallback 1: Retorna pela mesma rota original se for forçado
-            rota_volta = nx.shortest_path(G, best_node, orig_node, weight="peso_roteamento")
+            rota_volta = nx.shortest_path(G, best_node, orig_node, weight="length")
         except nx.NetworkXNoPath:
-            # Fallback 2: Grafo sem volta possível (rua sem saída direcional)
             print("Agente 4: Alerta - Rota de volta impossível no grafo atual.")
             rota_volta = [best_node]
             
@@ -131,7 +157,9 @@ def aplicar_motor_roteamento(estado: EstadoAgentico) -> dict:
     # 6. Renderização de Artefato Geoespacial (Mapa)
     m = folium.Map(location=[lat, lon], zoom_start=14)
     if coordenadas_rota:
-        folium.PolyLine(coordenadas_rota, color="blue", weight=5, opacity=0.8).add_to(m)
+        from folium.plugins import AntPath
+        # Usamos AntPath em vez de PolyLine para mostrar a direção do percurso com setas animadas
+        AntPath(coordenadas_rota, delay=800, color="blue", weight=5, opacity=0.8).add_to(m)
         folium.Marker(coordenadas_rota[0], popup="Partida/Chegada", icon=folium.Icon(color='green')).add_to(m)
         
     pasta_data = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "data"))
@@ -139,11 +167,29 @@ def aplicar_motor_roteamento(estado: EstadoAgentico) -> dict:
     nome_arquivo = f"mapa_rota_{sessao_id}.html"
     caminho_mapa = os.path.join(pasta_data, nome_arquivo)
     m.save(caminho_mapa)
-    
     print(f"Agente 4: Mapa salvo em {caminho_mapa}. Distância total: {distancia_real_km}km.")
+    
+    # 7. Renderização de Artefato de Imagem Estática (PNG)
+    caminho_imagem = None
+    try:
+        nome_imagem = f"mapa_rota_{sessao_id}.png"
+        caminho_imagem_full = os.path.join(pasta_data, nome_imagem)
+        if rota_completa:
+            fig, ax = ox.plot_graph_route(
+                G, rota_completa, 
+                route_color="cyan", route_linewidth=6, 
+                node_size=0, edge_color="#333333", edge_linewidth=0.5,
+                show=False, close=True
+            )
+            fig.savefig(caminho_imagem_full, dpi=300, bbox_inches='tight', facecolor=fig.get_facecolor())
+            caminho_imagem = caminho_imagem_full
+            print(f"Agente 4: Imagem salva em {caminho_imagem}.")
+    except Exception as e:
+        print(f"Agente 4: Aviso - Falha ao gerar imagem do mapa estático: {e}")
     
     return {
         "coordenadas_rota": coordenadas_rota,
         "caminho_mapa_html": caminho_mapa,
+        "caminho_mapa_img": caminho_imagem,
         "distancia_real_calculada": distancia_real_km
     }
