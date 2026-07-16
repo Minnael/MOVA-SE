@@ -61,5 +61,8 @@ class EstadoAgentico(TypedDict):
     caminho_mapa_html: str | None
     distancia_real_calculada: float | None
 
-    # Relatório narrativo gerado pelo Agente Comunicador (Ollama).
+    # Caminho do PNG da rota/malha plotada (nó plotar_grafo).
+    caminho_imagem: str | None
+
+    # Relatório narrativo gerado pelo Agente Comunicador (MiniMax).
     relatorio_narrativo: str | None

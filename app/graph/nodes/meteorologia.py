@@ -60,8 +60,19 @@ def analisar_clima(estado: EstadoAgentico) -> dict:
     data_hora = requisitos["janela_temporal"]
     modalidade = requisitos["modalidade"]
 
-    # 1. Buscar dados de clima reais da API Open-Meteo
-    dados_clima = consultar_open_meteo(lat, lon, data_hora)
+    # 1. Buscar dados de clima reais da API Open-Meteo. Se a API falhar
+    # (timeout, 429/limite de requisições etc.), usa valores neutros para não
+    # derrubar todo o fluxo — o roteamento não depende do clima.
+    try:
+        dados_clima = consultar_open_meteo(lat, lon, data_hora)
+    except Exception as e:
+        logger.warning("[meteorologia] Falha ao consultar Open-Meteo (%s). Usando clima neutro.", e)
+        dados_clima = {
+            "temperatura": 25.0,
+            "chuva_probabilidade": 0,
+            "indice_uv": 5.0,
+            "velocidade_vento": 10.0,
+        }
 
     # 2. Montar prompt do usuário
     prompt_usuario = (

@@ -24,8 +24,8 @@ _SYSTEM_PROMPT = (
     "com base nos dados da rota planejada e da previsão do tempo. "
     "Escreva um relatório com 2 a 3 parágrafos curtos explicando a rota, o horário, a distância, "
     "dando dicas de preparação relacionadas ao treino e dicas de saúde/segurança baseadas no clima. "
-    "Informe também de maneira clara que o mapa detalhado com a infraestrutura foi gerado (mencionando o caminho do arquivo). "
     "NÃO fale sobre alimentação, refeições ou nutrição. "
+    "NÃO mencione caminhos de arquivo, nomes de arquivos, mapas gerados ou onde algo foi salvo. "
     "NÃO cite o nome de nenhum sistema, marca ou aplicativo (por exemplo, 'MOVA-SE'). "
     "Não inclua pensamentos, tags XML, títulos, nem textos soltos antes ou depois do relatório. "
     "Apenas o relatório final legível."
@@ -40,7 +40,6 @@ def redigir_relatorio(estado: EstadoAgentico) -> dict:
     requisitos = estado.get("requisitos", {})
     clima = estado.get("relatorio_clima", "Sem dados de clima.")
     diretrizes = estado.get("diretrizes_clima", {})
-    grafo_path = estado.get("caminho_mapa_html", "Grafo não gerado.")
     distancia_real = estado.get("distancia_real_calculada", requisitos.get("distancia_alvo_km"))
 
     dados_consolidados = {
@@ -48,7 +47,6 @@ def redigir_relatorio(estado: EstadoAgentico) -> dict:
         "previsao_clima": clima,
         "alertas_seguranca_climatica": diretrizes,
         "distancia_efetiva_da_rota_km": distancia_real,
-        "arquivo_rota_viaria": grafo_path
     }
     
     dados_json = json.dumps(dados_consolidados, indent=2, ensure_ascii=False)

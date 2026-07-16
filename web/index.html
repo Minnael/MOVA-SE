@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOVA-SE — Planejador de Rotas</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header class="cabecalho">
+        <h1>MOVA-SE</h1>
+        <p>Rotas inteligentes de corrida e ciclismo urbano — Natal/RN</p>
+    </header>
+
+    <main class="conteudo">
+        <section class="painel-entrada">
+            <label for="descricao" class="rotulo">Descreva o seu treino</label>
+            <textarea
+                id="descricao"
+                rows="4"
+                placeholder="Descreva como, quando e onde: modalidade (corrida ou ciclismo), data e horário, ponto de partida (bairro/parque no RN) e a distância desejada. Ex.: 'Quero uma corrida de 5 km em Ponta Negra amanhã às 6h da manhã.'"
+            ></textarea>
+            <button id="btn-gerar" class="botao">Gerar rota</button>
+            <p class="dica">O processamento pode levar até ~1 minuto (clima, mapa viário e cálculo da rota).</p>
+        </section>
+
+        <section id="erro" class="painel-erro oculto"></section>
+
+        <section id="carregando" class="painel-carregando oculto">
+            <div class="spinner" aria-hidden="true"></div>
+            <p>Gerando a sua rota… consultando clima, baixando a malha viária e otimizando o percurso.</p>
+        </section>
+
+        <section id="resultado" class="painel-resultado oculto">
+            <div class="metricas" id="metricas"></div>
+
+            <div class="bloco-mapa">
+                <h2>Mapa da rota</h2>
+                <iframe id="mapa" title="Mapa da rota" class="mapa"></iframe>
+            </div>
+
+            <div class="bloco-relatorio">
+                <h2>Avaliação final</h2>
+                <div id="relatorio" class="relatorio"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="rodape">
+        <span>Sistema agêntico multiagente · LangGraph + OSMnx · TCC/APS Eng. de Computação</span>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

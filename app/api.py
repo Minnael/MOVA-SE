@@ -7,13 +7,23 @@ para o grafo de orquestração.
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.graph.builder import construir_grafo
+from app.graph.nodes.plotter import CAMINHO_IMAGEM
 
 logger = logging.getLogger(__name__)
+
+# Diretórios de artefatos (data/) e do front-end (web/), relativos à raiz do repo.
+_RAIZ = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DIR_DATA = os.path.join(_RAIZ, "data")
+DIR_WEB = os.path.join(_RAIZ, "web")
+os.makedirs(DIR_DATA, exist_ok=True)
 
 app = FastAPI(title="MOVA-SE")
 
@@ -30,12 +40,14 @@ class RequisicaoRota(BaseModel):
 
 @app.post("/rotas")
 def solicitar_rota(requisicao: RequisicaoRota) -> dict:
-    """Recebe o texto do usuário e aciona o grafo agêntico.
+    """Recebe o texto do usuário e aciona o grafo agêntico completo.
 
-    Ainda não executa roteamento real: retorna o estado resultante com os
-    requisitos consolidados pelo Orquestrador (parte dos campos ainda mocada).
+    Retorna o estado final: coordenadas, requisitos, análise de clima, rota
+    calculada (``coordenadas_rota``/``distancia_real_calculada``), mapa Folium
+    (``caminho_mapa_html``), imagem PNG e o relatório narrativo do Comunicador.
 
-    Erros de extração (ex.: data/horário no passado) viram HTTP 422.
+    Erros de extração/validação (ex.: data/horário no passado, lugar fora do RN)
+    viram HTTP 422.
     """
     logger.info("[API] Nova requisição de rota: %r", requisicao.texto_descritivo)
     try:
@@ -45,6 +57,19 @@ def solicitar_rota(requisicao: RequisicaoRota) -> dict:
     except ValueError as erro:
         logger.warning("[API] Requisição rejeitada (422): %s", erro)
         raise HTTPException(status_code=422, detail=str(erro)) from erro
+
+
+@app.get("/rotas/imagem")
+def obter_imagem_grafo() -> FileResponse:
+    """Retorna o PNG do grafo viário gerado pela última chamada a ``POST /rotas``."""
+    if not os.path.exists(CAMINHO_IMAGEM):
+        logger.warning("[API] Imagem do grafo ainda não gerada")
+        raise HTTPException(
+            status_code=404,
+            detail="Nenhuma imagem gerada ainda. Chame POST /rotas primeiro.",
+        )
+    logger.info("[API] Servindo imagem do grafo: %s", CAMINHO_IMAGEM)
+    return FileResponse(CAMINHO_IMAGEM, media_type="image/png", filename="mapa_grafo.png")
 
 
 from app.graph.nodes.comunicador import redigir_relatorio
@@ -78,5 +103,18 @@ def testar_agente5_isolado() -> dict:
     # Aciona diretamente o Comunicador (MiniMax) passando por cima de todo o resto
     resultado = redigir_relatorio(estado_ficticio)
     estado_ficticio["relatorio_narrativo"] = resultado["relatorio_narrativo"]
-    
+
     return estado_ficticio
+
+
+# --- Front-end (servido pela própria API, mesma origem => sem CORS) ---------
+@app.get("/")
+def pagina_inicial() -> FileResponse:
+    """Serve a tela inicial (web/index.html)."""
+    return FileResponse(os.path.join(DIR_WEB, "index.html"))
+
+
+# Assets estáticos do front (style.css, app.js).
+app.mount("/static", StaticFiles(directory=DIR_WEB), name="static")
+# Artefatos gerados: mapa Folium (mapa_rota_*.html) e imagens (mapa_grafo.png).
+app.mount("/data", StaticFiles(directory=DIR_DATA), name="data")

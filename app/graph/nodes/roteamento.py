@@ -7,6 +7,7 @@ urbanos. Desenha e salva o mapa interativo usando Folium.
 
 from __future__ import annotations
 
+import math
 import os
 import networkx as nx
 import osmnx as ox
@@ -55,77 +56,89 @@ def aplicar_motor_roteamento(estado: EstadoAgentico) -> dict:
         w = length * (1.0 + (alpha * grade_abs) + (2.0 * Se) - (1.5 * Ie))
         data["peso_roteamento"] = max(0.1, w)
         
-    # 3. Busca do Destino (ponto de retorno)
+    # 3. Preparação: origem, distâncias (por comprimento) e ângulos dos nós.
     orig_node = ox.distance.nearest_nodes(G, X=lon, Y=lat)
-    target_dist = distancia_alvo / 2.0
-    
+    ox0, oy0 = G.nodes[orig_node]["x"], G.nodes[orig_node]["y"]
     lengths = nx.single_source_dijkstra_path_length(G, orig_node, weight="length")
-    
-    best_node = None
-    best_diff = float("inf")
-    
-    # Encontrar o nó mais próximo da metade da distância alvo
-    for node, dist in lengths.items():
-        if node != orig_node:
-            diff = abs(dist - target_dist)
-            if diff < best_diff:
-                best_diff = diff
-                best_node = node
-                
-    if best_node is None:
-        best_node = orig_node
-        
-    # 4. Cálculo da Rota Otimizada em Circuito (Loop Heuristic)
-    try:
-        rota_ida = nx.shortest_path(G, orig_node, best_node, weight="peso_roteamento")
-    except nx.NetworkXNoPath:
-        rota_ida = [orig_node]
-        
-    # Penalizar as arestas da ida para forçar um caminho de volta diferente (Circuito Fechado)
-    G_volta = G.copy()
-    if len(rota_ida) > 1:
-        for i in range(len(rota_ida) - 1):
-            u = rota_ida[i]
-            v = rota_ida[i+1]
-            if G_volta.has_edge(u, v):
-                for k in G_volta[u][v]:
-                    G_volta[u][v][k]["peso_roteamento"] *= 100.0  # Punição severa
-            # Caso seja grafo direcionado e a via tenha sentido duplo, punimos a volta também
-            if G_volta.has_edge(v, u):
-                for k in G_volta[v][u]:
-                    G_volta[v][u][k]["peso_roteamento"] *= 100.0
-            
-    try:
-        rota_volta = nx.shortest_path(G_volta, best_node, orig_node, weight="peso_roteamento")
-    except nx.NetworkXNoPath:
+
+    def _bearing(node):
+        """Ângulo (graus) do nó em relação à origem."""
+        dx = G.nodes[node]["x"] - ox0
+        dy = G.nodes[node]["y"] - oy0
+        return math.degrees(math.atan2(dy, dx)) % 360.0
+
+    def _menor_caminho(grafo, origem, destino):
         try:
-            # Fallback 1: Retorna pela mesma rota original se for forçado
-            rota_volta = nx.shortest_path(G, best_node, orig_node, weight="peso_roteamento")
-        except nx.NetworkXNoPath:
-            # Fallback 2: Grafo sem volta possível (rua sem saída direcional)
-            print("Agente 4: Alerta - Rota de volta impossível no grafo atual.")
-            rota_volta = [best_node]
-            
-    rota_completa = rota_ida + rota_volta[1:] if len(rota_volta) > 1 else rota_ida
-    
+            return nx.shortest_path(grafo, origem, destino, weight="peso_roteamento")
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            return None
+
+    def _remover_arestas(grafo, rota):
+        for i in range(len(rota) - 1):
+            u, v = rota[i], rota[i + 1]
+            for a, b in ((u, v), (v, u)):
+                if grafo.has_edge(a, b):
+                    for k in list(grafo[a][b].keys()):
+                        grafo.remove_edge(a, b, k)
+
+    def _dist_m(rota):
+        """Comprimento total (m) de uma rota (soma dos ``length`` das arestas)."""
+        total = 0.0
+        for i in range(len(rota) - 1):
+            ed = G.get_edge_data(rota[i], rota[i + 1])
+            if ed:
+                total += min(float(d.get("length", 0.0)) for d in ed.values())
+        return total
+
+    def _construir_circuito(perna):
+        """CIRCUITO triangular origem -> A -> B -> origem, pernas ~'perna' (m).
+
+        A e B ficam a ~1 perna da origem, em direções ~135° separadas (bearing),
+        para "abrir" o triângulo; cada trecho remove as ruas já usadas para não
+        sobrepor a ida.
+        """
+        cands = [(n, d) for n, d in lengths.items() if n != orig_node and abs(d - perna) <= perna]
+        if not cands:
+            cands = [(n, d) for n, d in lengths.items() if n != orig_node]
+        if not cands:
+            return [orig_node]
+        node_a = min(cands, key=lambda nd: abs(nd[1] - perna))[0]
+        alvo_b = (_bearing(node_a) + 135.0) % 360.0
+        perto = [nd for nd in cands if abs(nd[1] - perna) <= perna * 0.6] or cands
+        node_b = min(perto, key=lambda nd: abs((_bearing(nd[0]) - alvo_b + 180.0) % 360.0 - 180.0))[0]
+
+        G_rest = G.copy()
+        rota = [orig_node]
+        for destino in (node_a, node_b, orig_node):
+            origem = rota[-1]
+            if destino == origem:
+                continue
+            trecho = _menor_caminho(G_rest, origem, destino) or _menor_caminho(G, origem, destino)
+            if not trecho or len(trecho) < 2:
+                continue
+            _remover_arestas(G_rest, trecho)
+            rota.extend(trecho[1:])
+        return rota
+
+    # 4. Itera a 'perna' até o comprimento total ficar perto da distância-alvo
+    # (tolerância de 15%), mantendo o formato de laço. Guarda o melhor resultado.
+    tolerancia = 0.15
+    perna = distancia_alvo / 3.0
+    rota_completa, distancia_real, melhor_erro = [orig_node], 0.0, float("inf")
+    for _ in range(6):
+        rota = _construir_circuito(perna)
+        dist = _dist_m(rota)
+        erro = abs(dist - distancia_alvo) / distancia_alvo if distancia_alvo else 0.0
+        if erro < melhor_erro:
+            rota_completa, distancia_real, melhor_erro = rota, dist, erro
+        if erro <= tolerancia or dist <= 0:
+            break
+        # Ajuste amortecido: escala a perna pela razão alvo/obtido.
+        perna *= max(0.5, min(2.0, distancia_alvo / dist))
+    print(f"Agente 4: circuito com {len(rota_completa)} nós, erro {melhor_erro * 100:.0f}% do alvo.")
+
     # 5. Extração Geométrica e Métricas
-    coordenadas_rota = []
-    distancia_real = 0.0
-    
-    for i in range(len(rota_completa) - 1):
-        u = rota_completa[i]
-        v = rota_completa[i+1]
-        coordenadas_rota.append((G.nodes[u]['y'], G.nodes[u]['x']))
-        
-        edge_data = G.get_edge_data(u, v)
-        if edge_data:
-            menor_length = min([float(d.get("length", 0.0)) for d in edge_data.values()])
-            distancia_real += menor_length
-            
-    if rota_completa:
-        ultimo_no = rota_completa[-1]
-        coordenadas_rota.append((G.nodes[ultimo_no]['y'], G.nodes[ultimo_no]['x']))
-        
+    coordenadas_rota = [(G.nodes[n]["y"], G.nodes[n]["x"]) for n in rota_completa]
     distancia_real_km = round(distancia_real / 1000.0, 2)
     
     # 6. Renderização de Artefato Geoespacial (Mapa)
