@@ -9,7 +9,7 @@ by <br/>
 ***
 ## Vídeo de Apresentação
 
-<a href="https://youtu.be/m69no4WSMIM" target="_blank">
+<a href="https://youtu.be/EtC3Wd-rgw8" target="_blank">
   <img src="https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" alt="YouTube" width="150"/>
 </a>
 
