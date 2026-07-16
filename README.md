@@ -1,5 +1,20 @@
 # MOVA-SE
 
+by <br/>
+[Daniel Bruno Trindade da Silva](https://github.com/daniel-trindade) <br/>
+[Ian Antonio Fonseca Araújo](https://github.com/Onifin) <br/>
+[Matheus Bezerra Dantas Saraiva](https://github.com/mbdsaraiva) <br/>
+[Minael Campelo de Oliveira](https://github.com/Minnael) <br/>
+
+***
+## Vídeo de Apresentação
+
+<a href="https://youtu.be/m69no4WSMIM" target="_blank">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" alt="YouTube" width="150"/>
+</a>
+
+***# 
+
 **Sistema Agêntico Multimodal para Roteamento Inteligente e Seguro de Atividades Físicas Urbanas**
 
 > Trabalho de Conclusão / Atividade Prática Supervisionada — Engenharia de Computação
